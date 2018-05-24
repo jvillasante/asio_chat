@@ -1,0 +1,10 @@
+-std=c++17
+-Wall
+-Wextra
+-Wshadow
+-pedantic
+-DASIO_STANDALONE
+-I/usr/local/opt/llvm/include/
+-I/usr/local/opt/llvm/include/c++/v1/
+-I/Users/jvillasante/Hacking/software/asio-1.12.1/include/
+-I.
