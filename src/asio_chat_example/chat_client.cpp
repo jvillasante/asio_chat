@@ -131,11 +131,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Get name
-    std::cout << "Enter a username: " << std::endl;
+    std::cout << "Enter a username: ";
     char from[chat_message::max_from_length + 1];
     std::cin >> from;
 
-    std::cout << "Enter a username to chat to: " << std::endl;
+    std::cout << "Enter a username to chat to: ";
     char to[chat_message::max_to_length + 1];
     std::cin >> to;
     ///////////////////////////////////////////////////////////
