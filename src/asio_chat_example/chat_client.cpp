@@ -12,7 +12,8 @@ typedef std::deque<chat_message> chat_message_queue;
 
 class chat_client {
 public:
-  chat_client(asio::io_context& io_context, const tcp::resolver::results_type& endpoints, const char* name)
+  chat_client(asio::io_context& io_context,
+              const tcp::resolver::results_type& endpoints, const char* name)
       : io_context_(io_context), socket_(io_context), name_(name) {
     do_connect(endpoints);
   }
@@ -33,26 +34,29 @@ public:
 
 private:
   void do_connect(const tcp::resolver::results_type& endpoints) {
-    asio::async_connect(socket_, endpoints, [this](std::error_code ec, tcp::endpoint) {
-      if (!ec) {
-        do_read_header();
-      }
-    });
+    asio::async_connect(socket_, endpoints,
+                        [this](std::error_code ec, tcp::endpoint) {
+                          if (!ec) {
+                            do_read_header();
+                          }
+                        });
   }
 
   void do_read_header() {
-    asio::async_read(socket_, asio::buffer(read_msg_.data(), chat_message::header_length),
-                     [this](std::error_code ec, std::size_t /*length*/) {
-                       if (!ec && read_msg_.unpack()) {
-                         do_read_from();
-                       } else {
-                         socket_.close();
-                       }
-                     });
+    asio::async_read(
+        socket_, asio::buffer(read_msg_.data(), chat_message::header_length),
+        [this](std::error_code ec, std::size_t /*length*/) {
+          if (!ec && read_msg_.unpack()) {
+            do_read_from();
+          } else {
+            socket_.close();
+          }
+        });
   }
 
   void do_read_from() {
-    asio::async_read(socket_, asio::buffer(read_msg_.from(), read_msg_.from_length()),
+    asio::async_read(socket_,
+                     asio::buffer(read_msg_.from(), read_msg_.from_length()),
                      [this](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
                          do_read_to();
@@ -63,7 +67,8 @@ private:
   }
 
   void do_read_to() {
-    asio::async_read(socket_, asio::buffer(read_msg_.to(), read_msg_.to_length()),
+    asio::async_read(socket_,
+                     asio::buffer(read_msg_.to(), read_msg_.to_length()),
                      [this](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
                          do_read_body();
@@ -74,45 +79,48 @@ private:
   }
 
   void do_read_body() {
-    asio::async_read(socket_, asio::buffer(read_msg_.body(), read_msg_.body_length()),
-                     [this](std::error_code ec, std::size_t /*length*/) {
-                       if (!ec) {
-                         if (std::strcmp(read_msg_.from(), name_) != 0) {
-                           if (read_msg_.body_length() == 0) {
-                             std::cout << "[";
-                             std::cout.write(read_msg_.from(), read_msg_.from_length());
-                             std::cout << "]: Started a chat with you.";
-                             std::cout << "\n";
-                           } else {
-                             std::cout << "[";
-                             std::cout.write(read_msg_.from(), read_msg_.from_length());
-                             std::cout << " to ";
-                             std::cout.write(read_msg_.to(), read_msg_.to_length());
-                             std::cout << "]: ";
-                             std::cout.write(read_msg_.body(), read_msg_.body_length());
-                             std::cout << "\n";
-                           }
-                         }
+    asio::async_read(
+        socket_, asio::buffer(read_msg_.body(), read_msg_.body_length()),
+        [this](std::error_code ec, std::size_t /*length*/) {
+          if (!ec) {
+            if (std::strcmp(read_msg_.from(), name_) != 0) {
+              if (read_msg_.body_length() == 0) {
+                std::cout << "[";
+                std::cout.write(read_msg_.from(), read_msg_.from_length());
+                std::cout << "]: Started a chat with you.";
+                std::cout << "\n";
+              } else {
+                std::cout << "[";
+                std::cout.write(read_msg_.from(), read_msg_.from_length());
+                std::cout << " to ";
+                std::cout.write(read_msg_.to(), read_msg_.to_length());
+                std::cout << "]: ";
+                std::cout.write(read_msg_.body(), read_msg_.body_length());
+                std::cout << "\n";
+              }
+            }
 
-                         do_read_header();
-                       } else {
-                         socket_.close();
-                       }
-                     });
+            do_read_header();
+          } else {
+            socket_.close();
+          }
+        });
   }
 
   void do_write() {
-    asio::async_write(socket_, asio::buffer(write_msgs_.front().data(), write_msgs_.front().length()),
-                      [this](std::error_code ec, std::size_t /*length*/) {
-                        if (!ec) {
-                          write_msgs_.pop_front();
-                          if (!write_msgs_.empty()) {
-                            do_write();
-                          }
-                        } else {
-                          socket_.close();
-                        }
-                      });
+    asio::async_write(
+        socket_,
+        asio::buffer(write_msgs_.front().data(), write_msgs_.front().length()),
+        [this](std::error_code ec, std::size_t /*length*/) {
+          if (!ec) {
+            write_msgs_.pop_front();
+            if (!write_msgs_.empty()) {
+              do_write();
+            }
+          } else {
+            socket_.close();
+          }
+        });
   }
 
 private:
