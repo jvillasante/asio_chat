@@ -1,1 +1,9 @@
-* CPP Project Template
+* Simple chat base on asio
+
+1. Run Server `./server 3333`
+2. Run different clients `./client 127.0.0.1 333`
+
+- Clients can send messages to the room for everyone to see
+- Clients can send private messages with the grammar: `/user message body` where `/user` is the name of a
+  connected user
+- Clients can get a list of connected users with the grammar: `/users`
