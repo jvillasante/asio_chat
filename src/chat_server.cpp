@@ -41,94 +41,51 @@ public:
   }
 
   void deliver(const chat_message& msg) {
-    std::cout << "BODY LENGTH: " << msg.body_length() << '\n';
-    std::cout << "BODY: " << msg.body() << '\n';
-
     std::string body(msg.body());
-    if (body.empty()) {
-      // User joined message
+    if (body.empty()) { // User joined message
+      chat_message response = user_joined_message(msg);
       for (auto participant : participants_) {
         if (std::strcmp(msg.name(), participant->name()) != 0) {
-          do_deliver(MessageType::JOIN, participant, msg);
+          participant->deliver(response);
         }
       }
-    } else if (body[0] != '/') {
-      // Room message
+    } else if (body[0] != '/') { // Room message
+      chat_message response = room_message(msg);
       for (auto participant : participants_) {
         if (std::strcmp(msg.name(), participant->name()) != 0) {
-          do_deliver(MessageType::ROOM_MESSAGE, participant, msg);
+          participant->deliver(response);
         }
       }
-    } else if (body[0] == '/') {
-      // Command message
+    } else if (body[0] == '/') {              // Command message
       std::string command = body.erase(0, 1); // Remove / character
 
-      if (command == "users") {
-        // Handle command for user list
+      if (command == "users") { // Handle command for user list
         auto participant_iter = std::find_if(
             participants_.begin(), participants_.end(),
             [&msg](const auto& p) { return p->name() == msg.name(); });
         if (participant_iter != participants_.end()) {
-          do_deliver(MessageType::USER_LIST, *participant_iter, msg);
+          chat_message response = user_list_message(msg);
+          (*participant_iter)->deliver(response);
         }
-      } else {
-        // Handle command for private message
+      } else { // Handle command for private message
         std::string user = {};
         std::size_t space_pos = command.find(" ");
         if (space_pos != std::string::npos) {
           user = command.substr(0, space_pos);
         }
 
-        auto participants_iter =
+        auto participant_iter =
             std::find_if(participants_.begin(), participants_.end(),
                          [&user](const auto& p) { return p->name() == user; });
-        if (participants_iter != participants_.end()) {
-          do_deliver(MessageType::PRIVATE_MESSAGE, *participants_iter, msg);
+        if (participant_iter != participants_.end()) {
+          chat_message response = private_message(msg);
+          (*participant_iter)->deliver(response);
         }
       }
     }
   }
 
 private:
-  enum class MessageType { JOIN, ROOM_MESSAGE, USER_LIST, PRIVATE_MESSAGE };
-
-  void do_deliver(MessageType type, const chat_participant_ptr& participant,
-                  const chat_message& msg) {
-    switch (type) {
-    case MessageType::JOIN: {
-      std::cout << "JOIN\n";
-      chat_message response = user_joined_message(msg);
-      participant->deliver(response);
-      break;
-    }
-
-    case MessageType::ROOM_MESSAGE: {
-      std::cout << "ROOM MESSAGE\n";
-      chat_message response = room_message(msg);
-      participant->deliver(response);
-      break;
-    }
-
-    case MessageType::USER_LIST: {
-      std::cout << "USER LIST\n";
-      chat_message response = user_list_message(msg);
-      participant->deliver(response);
-      break;
-    }
-
-    case MessageType::PRIVATE_MESSAGE: {
-      std::cout << "PRIVATE MESSAGE\n";
-      chat_message response = private_message(msg);
-      participant->deliver(response);
-      break;
-    }
-
-    default:
-      std::cout << "Can't handle message!!!";
-      break;
-    }
-  }
-
   chat_message user_joined_message(const chat_message& from_msg) {
     std::string response(from_msg.name());
     response += " joined the chat.";
