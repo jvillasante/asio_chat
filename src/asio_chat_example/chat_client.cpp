@@ -59,6 +59,7 @@ private:
                      asio::buffer(read_msg_.name(), read_msg_.name_length()),
                      [this](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
+                         read_msg_.name()[read_msg_.name_length()] = '\0';
                          name_ = read_msg_.name();
                          do_read_body();
                        } else {
@@ -72,9 +73,7 @@ private:
         socket_, asio::buffer(read_msg_.body(), read_msg_.body_length()),
         [this](std::error_code ec, std::size_t /*length*/) {
           if (!ec) {
-            // std::cout << "[";
-            // std::cout.write(read_msg_.name(), read_msg_.name_length());
-            // std::cout << "]: ";
+            read_msg_.body()[read_msg_.body_length()] = '\0';
             std::cout.write(read_msg_.body(), read_msg_.body_length());
             std::cout << "\n";
 

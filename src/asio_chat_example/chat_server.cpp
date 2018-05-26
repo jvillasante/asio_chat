@@ -235,6 +235,7 @@ private:
                      asio::buffer(read_msg_.name(), read_msg_.name_length()),
                      [this, self](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
+                         read_msg_.name()[read_msg_.name_length()] = '\0';
                          name_ = read_msg_.name();
                          do_read_body();
                        } else {
@@ -249,6 +250,7 @@ private:
                      asio::buffer(read_msg_.body(), read_msg_.body_length()),
                      [this, self](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
+                         read_msg_.body()[read_msg_.body_length()] = '\0';
                          read_msg_.pack();
                          room_.deliver(read_msg_);
                          do_read_header();
