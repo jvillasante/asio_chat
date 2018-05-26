@@ -8,6 +8,7 @@
 #include <memory>
 #include <set>
 #include <utility>
+#include <sstream>
 
 using asio::ip::tcp;
 
@@ -22,8 +23,7 @@ public:
   virtual ~chat_participant() {}
   virtual void deliver(const chat_message& msg) = 0;
 
-  virtual const char* from() = 0;
-  virtual const char* to() = 0;
+  virtual const char* name() = 0;
 };
 
 typedef std::shared_ptr<chat_participant> chat_participant_ptr;
@@ -33,12 +33,7 @@ typedef std::shared_ptr<chat_participant> chat_participant_ptr;
 class chat_room {
 public:
   void join(chat_participant_ptr participant) {
-    const auto& rc = participants_.insert(participant);
-    if (rc.second) {
-      for (const auto& msg : recent_msgs_) {
-        do_deliver(participant, msg);
-      }
-    }
+    participants_.insert(participant);
   }
 
   void leave(chat_participant_ptr participant) {
@@ -46,30 +41,153 @@ public:
   }
 
   void deliver(const chat_message& msg) {
-    recent_msgs_.push_back(msg);
-    while (recent_msgs_.size() > max_recent_msgs) {
-      recent_msgs_.pop_front();
-    }
+    std::string body(msg.body());
 
-    for (auto participant : participants_) {
-      do_deliver(participant, msg);
-    }
-  }
+    if (body.empty()) {
+      // User joined message
+      for (auto participant : participants_) {
+        if (std::strcmp(msg.name(), participant->name()) != 0) {
+          do_deliver(MessageType::JOIN, participant, msg);
+        }
+      }
+    } else if (body[0] != '/') {
+      // Room message
+      for (auto participant : participants_) {
+        if (std::strcmp(msg.name(), participant->name()) != 0) {
+          do_deliver(MessageType::ROOM_MESSAGE, participant, msg);
+        }
+      }
+    } else if (body[0] == '/') {
+      // Command message
+      std::string command = body.erase(0, 1); // Remove / character
 
-private:
-  void do_deliver(const chat_participant_ptr& participant,
-                  const chat_message& msg) {
-    if (std::strcmp(msg.from(), participant->to()) == 0) {
-      if (std::strcmp(msg.to(), participant->from()) == 0) {
-        participant->deliver(msg);
+      if (command == "users") {
+        // Handle command for user list
+        auto participant_iter = std::find_if(
+            participants_.begin(), participants_.end(),
+            [&msg](const auto& p) { return p->name() == msg.name(); });
+        if (participant_iter != participants_.end()) {
+          do_deliver(MessageType::USER_LIST, *participant_iter, msg);
+        }
+      } else {
+        // Handle command for private message
+        std::string user = {};
+        std::size_t space_pos = command.find(" ");
+        if (space_pos != std::string::npos) {
+          user = command.substr(0, space_pos);
+        }
+
+        auto participants_iter =
+            std::find_if(participants_.begin(), participants_.end(),
+                         [&user](const auto& p) { return p->name() == user; });
+        if (participants_iter != participants_.end()) {
+          do_deliver(MessageType::PRIVATE_MESSAGE, *participants_iter, msg);
+        }
       }
     }
   }
 
 private:
+  enum class MessageType { JOIN, ROOM_MESSAGE, USER_LIST, PRIVATE_MESSAGE };
+
+  void do_deliver(MessageType type, const chat_participant_ptr& participant,
+                  const chat_message& msg) {
+    switch (type) {
+    case MessageType::JOIN: {
+      std::cout << "JOIN\n";
+      chat_message response = user_joined_message(msg);
+      participant->deliver(response);
+      break;
+    }
+
+    case MessageType::ROOM_MESSAGE: {
+      std::cout << "ROOM MESSAGE\n";
+      chat_message response = room_message(msg);
+      participant->deliver(response);
+      break;
+    }
+
+    case MessageType::USER_LIST: {
+      std::cout << "USER LIST\n";
+      chat_message response = user_list_message(msg);
+      participant->deliver(response);
+      break;
+    }
+
+    case MessageType::PRIVATE_MESSAGE: {
+      std::cout << "PRIVATE MESSAGE\n";
+      chat_message response = private_message(msg);
+      participant->deliver(response);
+      break;
+    }
+
+    default:
+      std::cout << "Can't handle message!!!";
+      break;
+    }
+  }
+
+  chat_message user_joined_message(const chat_message& from_msg) {
+    std::string response(from_msg.name());
+    response += " joined the chat.";
+    return build_message(from_msg.name(), response.c_str());
+  }
+
+  chat_message room_message(const chat_message& from_msg) {
+    std::string body(from_msg.body());
+
+    std::stringstream ss;
+    ss << from_msg.name() << " says: ";
+    ss << body;
+    return build_message(from_msg.name(), ss.str().c_str());
+  }
+
+  chat_message user_list_message(const chat_message& from_msg) {
+    std::stringstream ss;
+    for (const auto& participant : participants_) {
+      if (participant->name() != from_msg.name()) {
+        ss << participant->name();
+        ss << "\n";
+      }
+    }
+
+    std::string users = ss.str();
+    if (users.empty()) {
+      return build_message(from_msg.name(), "No users connected.\n");
+    } else {
+      return build_message(from_msg.name(), users.c_str());
+    }
+  }
+
+  chat_message private_message(const chat_message& from_msg) {
+    std::string body(from_msg.body());
+
+    std::size_t space_pos = body.find(" ");
+    if (space_pos != std::string::npos) {
+      body = body.substr(space_pos + 1);
+    }
+
+    std::stringstream ss;
+    ss << from_msg.name() << " says: ";
+    ss << body;
+    return build_message(from_msg.name(), ss.str().c_str());
+  }
+
+  chat_message build_message(const char* name, const char* body) {
+    chat_message msg;
+
+    msg.name_length(std::strlen(name));
+    std::memcpy(msg.name(), name, msg.name_length());
+
+    msg.body_length(std::strlen(body));
+    std::memcpy(msg.body(), body, msg.body_length());
+
+    msg.pack();
+    return msg;
+  }
+
+private:
   std::set<chat_participant_ptr> participants_;
-  enum { max_recent_msgs = 100 };
-  chat_message_queue recent_msgs_;
 };
 
 //----------------------------------------------------------------------
@@ -80,7 +198,6 @@ public:
   chat_session(tcp::socket socket, chat_room& room)
       : socket_(std::move(socket)), room_(room) {}
 
-  // std::string s = socket.remote_endpoint().address().to_string();
   void start() { do_read_header(); }
 
   void deliver(const chat_message& msg) override {
@@ -91,8 +208,7 @@ public:
     }
   }
 
-  const char* from() override { return from_; }
-  const char* to() override { return to_; }
+  const char* name() override { return name_; }
 
 private:
   void do_read_header() {
@@ -101,34 +217,20 @@ private:
         socket_, asio::buffer(read_msg_.data(), chat_message::header_length),
         [this, self](std::error_code ec, std::size_t /*length*/) {
           if (!ec && read_msg_.unpack()) {
-            do_read_from();
+            do_read_name();
           } else {
             room_.leave(shared_from_this());
           }
         });
   }
 
-  void do_read_from() {
+  void do_read_name() {
     auto self(shared_from_this());
     asio::async_read(socket_,
-                     asio::buffer(read_msg_.from(), read_msg_.from_length()),
+                     asio::buffer(read_msg_.name(), read_msg_.name_length()),
                      [this, self](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
-                         from_ = read_msg_.from();
-                         do_read_to();
-                       } else {
-                         room_.leave(shared_from_this());
-                       }
-                     });
-  }
-
-  void do_read_to() {
-    auto self(shared_from_this());
-    asio::async_read(socket_,
-                     asio::buffer(read_msg_.to(), read_msg_.to_length()),
-                     [this, self](std::error_code ec, std::size_t /*length*/) {
-                       if (!ec) {
-                         to_ = read_msg_.to();
+                         name_ = read_msg_.name();
                          do_read_body();
                        } else {
                          room_.leave(shared_from_this());
@@ -173,9 +275,7 @@ private:
   chat_room& room_;
   chat_message read_msg_;
   chat_message_queue write_msgs_;
-
-  const char* from_;
-  const char* to_;
+  const char* name_;
 };
 
 //----------------------------------------------------------------------

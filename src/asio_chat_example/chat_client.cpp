@@ -47,30 +47,19 @@ private:
         socket_, asio::buffer(read_msg_.data(), chat_message::header_length),
         [this](std::error_code ec, std::size_t /*length*/) {
           if (!ec && read_msg_.unpack()) {
-            do_read_from();
+            do_read_name();
           } else {
             socket_.close();
           }
         });
   }
 
-  void do_read_from() {
+  void do_read_name() {
     asio::async_read(socket_,
-                     asio::buffer(read_msg_.from(), read_msg_.from_length()),
+                     asio::buffer(read_msg_.name(), read_msg_.name_length()),
                      [this](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
-                         do_read_to();
-                       } else {
-                         socket_.close();
-                       }
-                     });
-  }
-
-  void do_read_to() {
-    asio::async_read(socket_,
-                     asio::buffer(read_msg_.to(), read_msg_.to_length()),
-                     [this](std::error_code ec, std::size_t /*length*/) {
-                       if (!ec) {
+                         name_ = read_msg_.name();
                          do_read_body();
                        } else {
                          socket_.close();
@@ -83,22 +72,11 @@ private:
         socket_, asio::buffer(read_msg_.body(), read_msg_.body_length()),
         [this](std::error_code ec, std::size_t /*length*/) {
           if (!ec) {
-            if (std::strcmp(read_msg_.from(), name_) != 0) {
-              if (read_msg_.body_length() == 0) {
-                std::cout << "[";
-                std::cout.write(read_msg_.from(), read_msg_.from_length());
-                std::cout << "]: Started a chat with you.";
-                std::cout << "\n";
-              } else {
-                std::cout << "[";
-                std::cout.write(read_msg_.from(), read_msg_.from_length());
-                std::cout << " to ";
-                std::cout.write(read_msg_.to(), read_msg_.to_length());
-                std::cout << "]: ";
-                std::cout.write(read_msg_.body(), read_msg_.body_length());
-                std::cout << "\n";
-              }
-            }
+            // std::cout << "[";
+            // std::cout.write(read_msg_.name(), read_msg_.name_length());
+            // std::cout << "]: ";
+            std::cout.write(read_msg_.body(), read_msg_.body_length());
+            std::cout << "\n";
 
             do_read_header();
           } else {
@@ -140,30 +118,24 @@ int main(int argc, char* argv[]) {
 
     // Get name
     std::cout << "Enter a username: ";
-    char from[chat_message::max_from_length + 1];
-    std::cin >> from;
+    char name[chat_message::max_name_length + 1];
+    std::cin >> name;
 
-    std::cout << "Enter a username to chat to: ";
-    char to[chat_message::max_to_length + 1];
-    std::cin >> to;
-    ///////////////////////////////////////////////////////////
-
+    // Create Client
     asio::io_context io_context;
     tcp::resolver resolver(io_context);
     auto endpoints = resolver.resolve(argv[1], argv[2]);
-    chat_client c(io_context, endpoints, from);
+    chat_client c(io_context, endpoints, name);
 
     std::thread t([&io_context]() { io_context.run(); });
 
+    // Chat!!
     char line[chat_message::max_body_length + 1];
     while (std::cin.getline(line, chat_message::max_body_length + 1)) {
       chat_message msg;
 
-      msg.from_length(std::strlen(from));
-      std::memcpy(msg.from(), from, msg.from_length());
-
-      msg.to_length(std::strlen(to));
-      std::memcpy(msg.to(), to, msg.to_length());
+      msg.name_length(std::strlen(name));
+      std::memcpy(msg.name(), name, msg.name_length());
 
       msg.body_length(std::strlen(line));
       std::memcpy(msg.body(), line, msg.body_length());
