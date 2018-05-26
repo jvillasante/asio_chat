@@ -41,8 +41,10 @@ public:
   }
 
   void deliver(const chat_message& msg) {
-    std::string body(msg.body());
+    std::cout << "BODY LENGTH: " << msg.body_length() << '\n';
+    std::cout << "BODY: " << msg.body() << '\n';
 
+    std::string body(msg.body());
     if (body.empty()) {
       // User joined message
       for (auto participant : participants_) {
@@ -198,7 +200,10 @@ public:
   chat_session(tcp::socket socket, chat_room& room)
       : socket_(std::move(socket)), room_(room) {}
 
-  void start() { do_read_header(); }
+  void start() {
+    room_.join(shared_from_this());
+    do_read_header();
+  }
 
   void deliver(const chat_message& msg) override {
     bool write_in_progress = !write_msgs_.empty();
@@ -244,7 +249,6 @@ private:
                      asio::buffer(read_msg_.body(), read_msg_.body_length()),
                      [this, self](std::error_code ec, std::size_t /*length*/) {
                        if (!ec) {
-                         room_.join(self);
                          read_msg_.pack();
                          room_.deliver(read_msg_);
                          do_read_header();
