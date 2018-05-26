@@ -15,5 +15,5 @@ clean:
 	@$(RM) $(BIN)/*
 
 all: clean
-	$(CC) $(CFLAGS) -o $(BIN)/client $(SRC)/asio_chat_example/chat_client.cpp
-	$(CC) $(CFLAGS) -o $(BIN)/server $(SRC)/asio_chat_example/chat_server.cpp
+	$(CC) $(CFLAGS) -o $(BIN)/client $(SRC)/chat_client.cpp
+	$(CC) $(CFLAGS) -o $(BIN)/server $(SRC)/chat_server.cpp
