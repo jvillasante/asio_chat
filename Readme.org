@@ -7,3 +7,4 @@
 - Clients can send private messages with the grammar: `/user message body` where `/user` is the name of a
   connected user
 - Clients can get a list of connected users with the grammar: `/users`
+- Clients can quit the chat with the grammar: `/quit`

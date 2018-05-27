@@ -37,6 +37,9 @@ public:
   }
 
   void leave(chat_participant_ptr participant) {
+    chat_message response = user_left_message(participant->name());
+    broadcast(response);
+
     participants_.erase(participant);
   }
 
@@ -44,29 +47,18 @@ public:
     std::string body(msg.body());
     if (body.empty()) { // User joined message
       chat_message response = user_joined_message(msg);
-      for (auto participant : participants_) {
-        if (std::strcmp(msg.name(), participant->name()) != 0) {
-          participant->deliver(response);
-        }
-      }
+      broadcast(response);
     } else if (body[0] != '/') { // Room message
       chat_message response = room_message(msg);
-      for (auto participant : participants_) {
-        if (std::strcmp(msg.name(), participant->name()) != 0) {
-          participant->deliver(response);
-        }
-      }
+      broadcast(response);
     } else if (body[0] == '/') {              // Command message
       std::string command = body.erase(0, 1); // Remove / character
 
       if (command == "users") { // Handle command for user list
-        auto participant_iter = std::find_if(
-            participants_.begin(), participants_.end(), [&msg](const auto& p) {
-              return (std::strcmp(p->name(), msg.name()) == 0);
-            });
-        if (participant_iter != participants_.end()) {
+        auto participant = find_participant(msg.name());
+        if (participant) {
           chat_message response = user_list_message(msg);
-          (*participant_iter)->deliver(response);
+          participant->deliver(response);
         }
       } else { // Handle command for private message
         std::string user = {};
@@ -75,19 +67,43 @@ public:
           user = command.substr(0, space_pos);
         }
 
-        auto participant_iter = std::find_if(
-            participants_.begin(), participants_.end(), [&user](const auto& p) {
-              return (std::strcmp(p->name(), user.c_str()) == 0);
-            });
-        if (participant_iter != participants_.end()) {
+        auto participant = find_participant(user.c_str());
+        if (participant) {
           chat_message response = private_message(msg);
-          (*participant_iter)->deliver(response);
+          participant->deliver(response);
         }
       }
     }
   }
 
 private:
+  chat_participant_ptr find_participant(const char* name) {
+    auto participant_iter = std::find_if(
+        participants_.begin(), participants_.end(),
+        [&name](const auto& p) { return (std::strcmp(p->name(), name) == 0); });
+
+    if (participant_iter != participants_.end()) {
+      return *participant_iter;
+    }
+
+    return nullptr;
+  }
+
+  void broadcast(const chat_message& msg) {
+    for (auto participant : participants_) {
+      if (std::strcmp(msg.name(), participant->name()) != 0) {
+        participant->deliver(msg);
+      }
+    }
+  }
+
+  chat_message user_left_message(const char* name) {
+    std::stringstream ss;
+    ss << name;
+    ss << " left the chat.";
+    return build_message(name, ss.str().c_str());
+  }
+
   chat_message user_joined_message(const chat_message& from_msg) {
     std::stringstream ss;
     ss << from_msg.name();
@@ -137,10 +153,10 @@ private:
     chat_message msg;
 
     msg.name_length(std::strlen(name));
-    std::memcpy(msg.name(), name, msg.name_length());
+    msg.set_name(name);
 
     msg.body_length(std::strlen(body));
-    std::memcpy(msg.body(), body, msg.body_length());
+    msg.set_body(body);
 
     msg.pack();
     return msg;

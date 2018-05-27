@@ -134,17 +134,22 @@ int main(int argc, char* argv[]) {
       chat_message msg;
 
       msg.name_length(std::strlen(name));
-      std::memcpy(msg.name(), name, msg.name_length());
+      msg.set_name(name);
 
       msg.body_length(std::strlen(line));
-      std::memcpy(msg.body(), line, msg.body_length());
+      msg.set_body(line);
 
       msg.pack();
       c.write(msg);
+
+      if (std::strcmp(msg.body(), "/quit") == 0) {
+        break;
+      }
     }
 
     c.close();
     t.join();
+    std::cout << "Bye Bye!!!\n";
   } catch (std::exception& e) {
     std::cerr << "Exception: " << e.what() << "\n";
   }
