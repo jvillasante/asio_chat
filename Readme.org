@@ -3,6 +3,7 @@
 1. Run Server `./server 3333`
 2. Run different clients `./client 127.0.0.1 333`
 
+- Server can see current users (name, ip, port) with grammar: `/users`
 - Clients can send messages to the room for everyone to see
 - Clients can send private messages with the grammar: `/user message body` where `/user` is the name of a
   connected user

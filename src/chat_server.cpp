@@ -24,6 +24,7 @@ public:
   virtual void deliver(const chat_message& msg) = 0;
 
   virtual const char* name() = 0;
+  virtual const tcp::socket& socket() = 0;
 };
 
 typedef std::shared_ptr<chat_participant> chat_participant_ptr;
@@ -45,6 +46,22 @@ public:
     broadcast(response);
 
     participants_.erase(participant);
+  }
+
+  std::string get_participants() {
+    std::stringstream ss;
+    for (const auto& participant : participants_) {
+      const auto& remote = participant->socket().remote_endpoint();
+
+      ss << participant->name();
+      ss << " @ ";
+      ss << remote.address().to_string();
+      ss << ":";
+      ss << remote.port();
+      ss << "\n";
+    }
+
+    return ss.str();
   }
 
   void deliver(const chat_message& msg) {
@@ -188,6 +205,7 @@ public:
   }
 
   const char* name() override { return name_; }
+  const tcp::socket& socket() override { return socket_; }
 
 private:
   void do_read_header() {
@@ -268,6 +286,8 @@ public:
     do_accept();
   }
 
+  std::string get_participants() { return room_.get_participants(); }
+
 private:
   void do_accept() {
     acceptor_.async_accept([this](std::error_code ec, tcp::socket socket) {
@@ -288,19 +308,25 @@ private:
 int main(int argc, char* argv[]) {
   try {
     if (argc < 2) {
-      std::cerr << "Usage: chat_server <port> [<port> ...]\n";
+      std::cerr << "Usage: chat_server <port>\n";
       return 1;
     }
 
     asio::io_context io_context;
 
-    std::list<chat_server> servers;
-    for (int i = 1; i < argc; ++i) {
-      tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[i]));
-      servers.emplace_back(io_context, endpoint);
+    tcp::endpoint endpoint(tcp::v4(), std::atoi(argv[1]));
+    chat_server server(io_context, endpoint);
+
+    std::thread t([&io_context]() { io_context.run(); });
+
+    char line[32];
+    while (std::cin.getline(line, chat_message::max_body_length + 1)) {
+      if (std::strcmp(line, "/users") == 0) {
+        std::cout << server.get_participants();
+      }
     }
 
-    io_context.run();
+    t.join();
   } catch (std::exception& e) {
     std::cerr << "Exception: " << e.what() << "\n";
   }
