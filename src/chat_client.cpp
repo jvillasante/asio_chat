@@ -131,6 +131,10 @@ int main(int argc, char* argv[]) {
     // Chat!!
     char line[chat_message::max_body_length + 1];
     while (std::cin.getline(line, chat_message::max_body_length + 1)) {
+      if (std::strcmp(line, "/quit") == 0) {
+        break; // socket will be closed, server will remove participant
+      }
+
       chat_message msg;
 
       msg.name_length(std::strlen(name));
@@ -141,10 +145,6 @@ int main(int argc, char* argv[]) {
 
       msg.pack();
       c.write(msg);
-
-      if (std::strcmp(msg.body(), "/quit") == 0) {
-        break;
-      }
     }
 
     c.close();
