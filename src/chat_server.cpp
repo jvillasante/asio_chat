@@ -33,7 +33,11 @@ typedef std::shared_ptr<chat_participant> chat_participant_ptr;
 class chat_room {
 public:
   void join(chat_participant_ptr participant) {
-    participants_.insert(participant);
+    auto rc = participants_.insert(participant);
+    if (rc.second) {
+      chat_message response = user_joined_message(participant->name());
+      broadcast(response);
+    }
   }
 
   void leave(chat_participant_ptr participant) {
@@ -45,9 +49,8 @@ public:
 
   void deliver(const chat_message& msg) {
     std::string body(msg.body());
-    if (body.empty()) { // User joined message
-      chat_message response = user_joined_message(msg);
-      broadcast(response);
+    if (body.empty()) {
+      return;
     } else if (body[0] != '/') { // Room message
       chat_message response = room_message(msg);
       broadcast(response);
@@ -104,11 +107,11 @@ private:
     return build_message(name, ss.str().c_str());
   }
 
-  chat_message user_joined_message(const chat_message& from_msg) {
+  chat_message user_joined_message(const char* name) {
     std::stringstream ss;
-    ss << from_msg.name();
+    ss << name;
     ss << " joined the chat.";
-    return build_message(from_msg.name(), ss.str().c_str());
+    return build_message(name, ss.str().c_str());
   }
 
   chat_message room_message(const chat_message& from_msg) {
@@ -174,10 +177,7 @@ public:
   chat_session(tcp::socket socket, chat_room& room)
       : socket_(std::move(socket)), room_(room) {}
 
-  void start() {
-    room_.join(shared_from_this());
-    do_read_header();
-  }
+  void start() { do_read_header(); }
 
   void deliver(const chat_message& msg) override {
     bool write_in_progress = !write_msgs_.empty();
@@ -211,9 +211,10 @@ private:
                        if (!ec) {
                          read_msg_.name()[read_msg_.name_length()] = '\0';
                          name_ = read_msg_.name();
+                         room_.join(self); // We need a name before joining
                          do_read_body();
                        } else {
-                         room_.leave(shared_from_this());
+                         room_.leave(self);
                        }
                      });
   }
@@ -229,7 +230,7 @@ private:
                          room_.deliver(read_msg_);
                          do_read_header();
                        } else {
-                         room_.leave(shared_from_this());
+                         room_.leave(self);
                        }
                      });
   }
@@ -246,7 +247,7 @@ private:
               do_write();
             }
           } else {
-            room_.leave(shared_from_this());
+            room_.leave(self);
           }
         });
   }
