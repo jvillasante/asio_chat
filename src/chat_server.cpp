@@ -61,8 +61,9 @@ public:
 
       if (command == "users") { // Handle command for user list
         auto participant_iter = std::find_if(
-            participants_.begin(), participants_.end(),
-            [&msg](const auto& p) { return p->name() == msg.name(); });
+            participants_.begin(), participants_.end(), [&msg](const auto& p) {
+              return (std::strcmp(p->name(), msg.name()) == 0);
+            });
         if (participant_iter != participants_.end()) {
           chat_message response = user_list_message(msg);
           (*participant_iter)->deliver(response);
@@ -74,9 +75,10 @@ public:
           user = command.substr(0, space_pos);
         }
 
-        auto participant_iter =
-            std::find_if(participants_.begin(), participants_.end(),
-                         [&user](const auto& p) { return p->name() == user; });
+        auto participant_iter = std::find_if(
+            participants_.begin(), participants_.end(), [&user](const auto& p) {
+              return (std::strcmp(p->name(), user.c_str()) == 0);
+            });
         if (participant_iter != participants_.end()) {
           chat_message response = private_message(msg);
           (*participant_iter)->deliver(response);
@@ -87,24 +89,23 @@ public:
 
 private:
   chat_message user_joined_message(const chat_message& from_msg) {
-    std::string response(from_msg.name());
-    response += " joined the chat.";
-    return build_message(from_msg.name(), response.c_str());
+    std::stringstream ss;
+    ss << from_msg.name();
+    ss << " joined the chat.";
+    return build_message(from_msg.name(), ss.str().c_str());
   }
 
   chat_message room_message(const chat_message& from_msg) {
-    std::string body(from_msg.body());
-
     std::stringstream ss;
     ss << from_msg.name() << " says: ";
-    ss << body;
+    ss << from_msg.body();
     return build_message(from_msg.name(), ss.str().c_str());
   }
 
   chat_message user_list_message(const chat_message& from_msg) {
     std::stringstream ss;
     for (const auto& participant : participants_) {
-      if (participant->name() != from_msg.name()) {
+      if (std::strcmp(participant->name(), from_msg.name()) != 0) {
         ss << participant->name();
         ss << "\n";
       }
