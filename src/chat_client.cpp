@@ -138,10 +138,10 @@ int main(int argc, char* argv[]) {
       chat_message msg;
 
       msg.name_length(std::strlen(name));
-      msg.set_name(name);
+      std::memcpy(msg.name(), name, msg.name_length());
 
       msg.body_length(std::strlen(line));
-      msg.set_body(line);
+      std::memcpy(msg.body(), line, msg.body_length());
 
       msg.pack();
       c.write(msg);

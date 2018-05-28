@@ -35,11 +35,6 @@ public:
       body_length_ = max_body_length;
   }
 
-  void set_body(const char* body) {
-    std::memset(body_, 0, max_body_length);
-    std::memcpy(body_, body, body_length_);
-  }
-
   // Name
   const char* name() const { return name_; }
   char* name() { return name_; }
@@ -50,11 +45,6 @@ public:
     name_length_ = new_length;
     if (name_length_ > max_name_length)
       name_length_ = max_name_length;
-  }
-
-  void set_name(const char* name) {
-    std::memset(name_, 0, max_name_length);
-    std::memcpy(name_, name, name_length_);
   }
 
   // Pack / Unpack message

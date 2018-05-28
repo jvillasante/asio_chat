@@ -173,10 +173,10 @@ private:
     chat_message msg;
 
     msg.name_length(std::strlen(name));
-    msg.set_name(name);
+    std::memcpy(msg.name(), name, msg.name_length());
 
     msg.body_length(std::strlen(body));
-    msg.set_body(body);
+    std::memcpy(msg.body(), body, msg.body_length());
 
     msg.pack();
     return msg;
@@ -322,7 +322,12 @@ int main(int argc, char* argv[]) {
     char line[32];
     while (std::cin.getline(line, chat_message::max_body_length + 1)) {
       if (std::strcmp(line, "/users") == 0) {
-        std::cout << server.get_participants();
+        auto participants = server.get_participants();
+        if (participants.empty()) {
+          std::cout << "No users connected.\n";
+        } else {
+          std::cout << server.get_participants();
+        }
       }
     }
 
